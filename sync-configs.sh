@@ -9,6 +9,10 @@ BACKUP_DIR="$HOME/.config-backups"
 # Global dry-run flag
 DRY_RUN=false
 
+# Backup configuration
+BACKUP_RETENTION_DAYS=30
+BACKUP_MAX_COUNT=100
+
 CONFIG_MAPPINGS=(
     "claude-md:$HOME/.claude/claude.md:$SCRIPT_DIR/claude/claude.md:file"
     "claude-agents:$HOME/.claude/agents:$SCRIPT_DIR/claude/agents:dir"
@@ -140,12 +144,176 @@ show_dry_run_details() {
     fi
 }
 
+# List all backup files sorted by modification time
+list_backup_files() {
+    if [[ ! -d "$BACKUP_DIR" ]]; then
+        return 0
+    fi
+    
+    find "$BACKUP_DIR" -type f -name "*_[0-9]*_[0-9]*" -exec stat -f "%m %N" {} \; 2>/dev/null | \
+        sort -n | \
+        cut -d' ' -f2-
+}
+
+# Clean up old backups based on retention policy
+cleanup_old_backups() {
+    if [[ ! -d "$BACKUP_DIR" ]]; then
+        echo "No backup directory found, skipping cleanup"
+        return 0
+    fi
+    
+    echo "Checking for old backups to clean up..."
+    
+    # Find backups older than retention period
+    local old_backups=()
+    while IFS= read -r -d '' backup_file; do
+        old_backups+=("$backup_file")
+    done < <(find "$BACKUP_DIR" -type f -name "*_[0-9]*_[0-9]*" -mtime +$BACKUP_RETENTION_DAYS -print0 2>/dev/null)
+    
+    # Find excess backups beyond max count
+    local all_backups=()
+    while IFS= read -r backup_file; do
+        if [[ -n "$backup_file" ]]; then
+            all_backups+=("$backup_file")
+        fi
+    done < <(list_backup_files)
+    
+    local excess_backups=()
+    if [[ ${#all_backups[@]} -gt $BACKUP_MAX_COUNT ]]; then
+        local excess_count=$((${#all_backups[@]} - BACKUP_MAX_COUNT))
+        for ((i=0; i<excess_count; i++)); do
+            excess_backups+=("${all_backups[i]}")
+        done
+    fi
+    
+    # Combine and deduplicate cleanup candidates
+    local cleanup_candidates=()
+    local all_candidates=()
+    
+    # Add old backups to candidates list
+    if [[ ${#old_backups[@]} -gt 0 ]]; then
+        all_candidates+=("${old_backups[@]}")
+    fi
+    
+    # Add excess backups to candidates list  
+    if [[ ${#excess_backups[@]} -gt 0 ]]; then
+        all_candidates+=("${excess_backups[@]}")
+    fi
+    
+    # Deduplicate the combined list
+    if [[ ${#all_candidates[@]} -gt 0 ]]; then
+        for backup in "${all_candidates[@]}"; do
+        local found=false
+        if [[ ${#cleanup_candidates[@]} -gt 0 ]]; then
+            for existing in "${cleanup_candidates[@]}"; do
+                if [[ "$existing" == "$backup" ]]; then
+                    found=true
+                    break
+                fi
+            done
+        fi
+        if [[ "$found" == "false" ]]; then
+            cleanup_candidates+=("$backup")
+        fi
+        done
+    fi
+    
+    if [[ ${#cleanup_candidates[@]} -eq 0 ]]; then
+        echo "  ✓ No old backups to clean up"
+        return 0
+    fi
+    
+    echo "  Found ${#cleanup_candidates[@]} backup(s) to clean up"
+    for backup_file in "${cleanup_candidates[@]}"; do
+        local backup_name
+        backup_name=$(basename "$backup_file")
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo "  [DRY-RUN] Would remove old backup: $backup_name"
+        else
+            echo "  Removing old backup: $backup_name"
+            if ! rm "$backup_file"; then
+                echo "  WARNING: Failed to remove backup: $backup_file" >&2
+            fi
+        fi
+    done
+    
+    if [[ "$DRY_RUN" != "true" ]]; then
+        echo "  ✓ Backup cleanup completed"
+    fi
+}
+
+# Show backup statistics
+show_backup_stats() {
+    if [[ ! -d "$BACKUP_DIR" ]]; then
+        echo "No backups found"
+        return 0
+    fi
+    
+    local backup_files=()
+    while IFS= read -r backup_file; do
+        if [[ -n "$backup_file" ]]; then
+            backup_files+=("$backup_file")
+        fi
+    done < <(list_backup_files)
+    
+    if [[ ${#backup_files[@]} -eq 0 ]]; then
+        echo "No backups found"
+        return 0
+    fi
+    
+    local total_size=0
+    for backup_file in "${backup_files[@]}"; do
+        if [[ -f "$backup_file" ]]; then
+            local size
+            size=$(stat -f%z "$backup_file" 2>/dev/null || echo "0")
+            total_size=$((total_size + size))
+        elif [[ -d "$backup_file" ]]; then
+            local size
+            size=$(du -sk "$backup_file" 2>/dev/null | cut -f1 || echo "0")
+            total_size=$((total_size + size * 1024))
+        fi
+    done
+    
+    local total_mb=$((total_size / 1024 / 1024))
+    echo "Backup Statistics:"
+    echo "  Total backups: ${#backup_files[@]}"
+    echo "  Total size: ${total_mb}MB"
+    echo "  Retention: $BACKUP_RETENTION_DAYS days (max $BACKUP_MAX_COUNT files)"
+    echo "  Location: $BACKUP_DIR"
+}
+
+# Verify backup integrity (basic check)
+verify_backup_integrity() {
+    local backup_path="$1"
+    local original_path="$2"
+    
+    if [[ ! -e "$backup_path" ]]; then
+        echo "  WARNING: Backup not found: $backup_path" >&2
+        return 1
+    fi
+    
+    # Basic integrity check - compare file types
+    if [[ -f "$original_path" ]] && [[ ! -f "$backup_path" ]]; then
+        echo "  WARNING: Type mismatch - original is file, backup is not: $backup_path" >&2
+        return 1
+    fi
+    
+    if [[ -d "$original_path" ]] && [[ ! -d "$backup_path" ]]; then
+        echo "  WARNING: Type mismatch - original is directory, backup is not: $backup_path" >&2
+        return 1
+    fi
+    
+    return 0
+}
+
 usage() {
-    echo "Usage: $0 [--dry-run] {pull|push}"
+    echo "Usage: $0 [--dry-run] {pull|push|backup-stats|backup-cleanup}"
     echo ""
-    echo "  pull      - Copy configs from system to repository"
-    echo "  push      - Copy configs from repository to system"
-    echo "  --dry-run - Preview operations without making changes"
+    echo "  pull           - Copy configs from system to repository"
+    echo "  push           - Copy configs from repository to system"
+    echo "  backup-stats   - Show backup statistics and disk usage"
+    echo "  backup-cleanup - Clean up old backups based on retention policy"
+    echo "  --dry-run      - Preview operations without making changes"
     echo ""
     echo "Configurations managed:"
     echo "  - Claude config (claude.md, agents/, commands/ from ~/.claude/)"
@@ -153,8 +321,15 @@ usage() {
     echo "  - Ghostty config (~/Library/Application Support/com.mitchellh.ghostty/config)"
     echo ""
     echo "Examples:"
-    echo "  $0 pull              # Sync from system to repo"
-    echo "  $0 --dry-run push    # Preview push operations"
+    echo "  $0 pull                    # Sync from system to repo"
+    echo "  $0 --dry-run push          # Preview push operations"
+    echo "  $0 backup-stats            # Show backup information"
+    echo "  $0 --dry-run backup-cleanup # Preview backup cleanup"
+    echo ""
+    echo "Backup Configuration:"
+    echo "  Retention: $BACKUP_RETENTION_DAYS days"
+    echo "  Max count: $BACKUP_MAX_COUNT files"
+    echo "  Location: $BACKUP_DIR"
 }
 
 create_backup() {
@@ -188,7 +363,14 @@ create_backup() {
                 return 1
             fi
         fi
-        echo "  ✓ Backup created successfully"
+        
+        # Verify backup integrity
+        if ! verify_backup_integrity "$backup_path" "$target"; then
+            echo "  WARNING: Backup integrity check failed for: $backup_path" >&2
+            # Don't fail the operation, just warn
+        else
+            echo "  ✓ Backup created and verified successfully"
+        fi
     fi
     
     return 0
@@ -298,7 +480,9 @@ sync_config() {
 }
 
 main() {
-    # Parse arguments for dry-run flag
+    local mode=""
+    
+    # Parse arguments for dry-run flag and mode
     while [[ $# -gt 0 ]]; do
         case $1 in
             --dry-run)
@@ -306,7 +490,15 @@ main() {
                 shift
                 ;;
             pull|push)
-                local mode="$1"
+                mode="$1"
+                shift
+                ;;
+            backup-stats)
+                mode="backup-stats"
+                shift
+                ;;
+            backup-cleanup)
+                mode="backup-cleanup"
                 shift
                 ;;
             *)
@@ -318,10 +510,24 @@ main() {
     done
     
     # Validate required mode argument
-    if [[ -z "${mode:-}" ]]; then
-        echo "ERROR: Mode (pull|push) is required" >&2
+    if [[ -z "$mode" ]]; then
+        echo "ERROR: Mode is required" >&2
         usage
         exit 1
+    fi
+    
+    # Handle backup management commands
+    if [[ "$mode" == "backup-stats" ]]; then
+        echo "=== Backup Statistics ==="
+        show_backup_stats
+        return 0
+    elif [[ "$mode" == "backup-cleanup" ]]; then
+        echo "=== Backup Cleanup ==="
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo "DRY-RUN mode - no backups will actually be removed"
+        fi
+        cleanup_old_backups
+        return 0
     fi
     
     # Display mode information
@@ -349,6 +555,13 @@ main() {
         echo ""
     done
     
+    # Run automatic backup cleanup after successful sync operations
+    if [[ $success_count -gt 0 ]] && [[ "$DRY_RUN" != "true" ]]; then
+        echo "=== Automatic Backup Cleanup ==="
+        cleanup_old_backups
+        echo ""
+    fi
+    
     echo "=== Sync Summary ==="
     if [[ "$DRY_RUN" == "true" ]]; then
         echo "DRY-RUN completed: $success_count/$total_count configurations would be synced"
@@ -364,7 +577,7 @@ main() {
         fi
         
         if [[ -d "$BACKUP_DIR" ]]; then
-            echo "Backups created in: $BACKUP_DIR"
+            show_backup_stats
         fi
     fi
 }

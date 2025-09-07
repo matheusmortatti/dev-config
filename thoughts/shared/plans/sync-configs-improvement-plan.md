@@ -1046,17 +1046,17 @@ main() {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Backup cleanup removes old files: Create test backups, run cleanup, verify removal
-- [ ] Backup retention policy respected: Test with various dates
-- [ ] Max count limit enforced: Create excess backups, verify cleanup
-- [ ] Dry-run doesn't actually remove files: Test cleanup dry-run
+- [x] Backup cleanup removes old files: Create test backups, run cleanup, verify removal
+- [x] Backup retention policy respected: Test with various dates
+- [x] Max count limit enforced: Create excess backups, verify cleanup
+- [x] Dry-run doesn't actually remove files: Test cleanup dry-run
 
 #### Manual Verification:
-- [ ] `backup-stats` command shows accurate information
-- [ ] Old backups are correctly identified and removed
-- [ ] Backup integrity warnings appear for corrupted backups
-- [ ] Automatic cleanup runs after successful sync operations
-- [ ] Manual cleanup commands work independently
+- [x] `backup-stats` command shows accurate information
+- [x] Old backups are correctly identified and removed
+- [x] Backup integrity warnings appear for corrupted backups
+- [x] Automatic cleanup runs after successful sync operations
+- [x] Manual cleanup commands work independently
 
 ---
 
