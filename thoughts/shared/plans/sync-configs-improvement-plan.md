@@ -336,17 +336,17 @@ main() {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Script passes shellcheck: `shellcheck sync-configs.sh`
-- [ ] No syntax errors: `bash -n sync-configs.sh`
-- [ ] Invalid mapping format detected: Test with malformed CONFIG_MAPPINGS
-- [ ] Permission errors handled gracefully: Test with read-only directories
+- [x] Script passes shellcheck: `shellcheck sync-configs.sh`
+- [x] No syntax errors: `bash -n sync-configs.sh`
+- [x] Invalid mapping format detected: Test with malformed CONFIG_MAPPINGS
+- [x] Permission errors handled gracefully: Test with read-only directories
 
 #### Manual Verification:
-- [ ] Error messages are clear and actionable
-- [ ] Script handles missing source files gracefully
-- [ ] Permission errors don't cause script crashes
-- [ ] Backup failures are properly reported
-- [ ] Success/failure summary is accurate
+- [x] Error messages are clear and actionable
+- [x] Script handles missing source files gracefully
+- [x] Permission errors don't cause script crashes
+- [x] Backup failures are properly reported
+- [x] Success/failure summary is accurate
 
 ---
 
@@ -671,17 +671,17 @@ main() {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] Dry-run mode doesn't create or modify files: `ls -la` before/after
-- [ ] Script shows correct operations in dry-run: `./sync-configs.sh --dry-run pull`
-- [ ] Argument parsing works correctly: Test `--dry-run pull`, `pull --dry-run`, invalid combinations
-- [ ] Help text updated and accurate: `./sync-configs.sh` shows new usage
+- [x] Dry-run mode doesn't create or modify files: `ls -la` before/after
+- [x] Script shows correct operations in dry-run: `./sync-configs.sh --dry-run pull`
+- [x] Argument parsing works correctly: Test `--dry-run pull`, `pull --dry-run`, invalid combinations
+- [x] Help text updated and accurate: `./sync-configs.sh` shows new usage
 
 #### Manual Verification:
-- [ ] Dry-run shows detailed operation information
-- [ ] File size and count information displayed for directories
-- [ ] Backup operations are previewed correctly
-- [ ] No actual file system changes occur in dry-run mode
-- [ ] Regular mode still works as before
+- [x] Dry-run shows detailed operation information
+- [x] File size and count information displayed for directories
+- [x] Backup operations are previewed correctly
+- [x] No actual file system changes occur in dry-run mode
+- [x] Regular mode still works as before
 
 ---
 
