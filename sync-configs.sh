@@ -13,6 +13,11 @@ DRY_RUN=false
 BACKUP_RETENTION_DAYS=30
 BACKUP_MAX_COUNT=100
 
+# Verbosity and output configuration
+VERBOSE=false
+QUIET=false
+SHOW_TIMESTAMPS=true
+
 CONFIG_MAPPINGS=(
     "claude-md:$HOME/.claude/claude.md:$SCRIPT_DIR/claude/claude.md:file"
     "claude-agents:$HOME/.claude/agents:$SCRIPT_DIR/claude/agents:dir"
@@ -37,38 +42,44 @@ validate_paths() {
     local repo_path="$2"
     local mode="$3"
     
+    log_verbose "Validating paths for $mode mode"
+    log_verbose "  System path: $system_path"
+    log_verbose "  Repo path: $repo_path"
+    
     if [[ "$mode" == "pull" ]]; then
         if [[ ! -e "$system_path" ]]; then
-            echo "WARNING: Source path does not exist: $system_path" >&2
+            log_warning "Source path does not exist: $system_path"
             return 1
         fi
         if [[ ! -r "$system_path" ]]; then
-            echo "ERROR: No read permission for: $system_path" >&2
+            log_error "No read permission for: $system_path"
             return 1
         fi
         # Check write permission for repo directory
         local repo_dir
         repo_dir="$(dirname "$repo_path")"
         if [[ ! -w "$repo_dir" ]] && [[ ! -w "$(dirname "$repo_dir")" ]]; then
-            echo "ERROR: No write permission for repository path: $repo_dir" >&2
+            log_error "No write permission for repository path: $repo_dir"
             return 1
         fi
+        log_verbose "  ✓ Pull validation passed"
     elif [[ "$mode" == "push" ]]; then
         if [[ ! -e "$repo_path" ]]; then
-            echo "WARNING: Repository path does not exist: $repo_path" >&2
+            log_warning "Repository path does not exist: $repo_path"
             return 1
         fi
         if [[ ! -r "$repo_path" ]]; then
-            echo "ERROR: No read permission for: $repo_path" >&2
+            log_error "No read permission for: $repo_path"
             return 1
         fi
         # Check write permission for system directory
         local system_dir
         system_dir="$(dirname "$system_path")"
         if [[ ! -w "$system_dir" ]] && [[ ! -w "$(dirname "$system_dir")" ]]; then
-            echo "ERROR: No write permission for system path: $system_dir" >&2
+            log_error "No write permission for system path: $system_dir"
             return 1
         fi
+        log_verbose "  ✓ Push validation passed"
     fi
     
     return 0
@@ -77,7 +88,7 @@ validate_paths() {
 # Validate all mappings at startup
 validate_all_mappings() {
     local errors=0
-    echo "Validating configuration mappings..."
+    log_info "Validating configuration mappings..."
     
     for mapping in "${CONFIG_MAPPINGS[@]}"; do
         if ! validate_mapping_format "$mapping"; then
@@ -86,11 +97,11 @@ validate_all_mappings() {
     done
     
     if [[ $errors -gt 0 ]]; then
-        echo "ERROR: Found $errors invalid mapping(s). Please fix CONFIG_MAPPINGS." >&2
+        log_error "Found $errors invalid mapping(s). Please fix CONFIG_MAPPINGS."
         exit 1
     fi
     
-    echo "✓ All mappings validated successfully"
+    log_success "All mappings validated successfully"
 }
 
 # Execute command or show what would be executed
@@ -306,14 +317,85 @@ verify_backup_integrity() {
     return 0
 }
 
+# Logging functions with timestamp and level support
+log_info() {
+    if [[ "$QUIET" != "true" ]]; then
+        if [[ "$SHOW_TIMESTAMPS" == "true" ]]; then
+            echo "$(date '+%H:%M:%S') [INFO] $*"
+        else
+            echo "$*"
+        fi
+    fi
+}
+
+log_verbose() {
+    if [[ "$VERBOSE" == "true" ]] && [[ "$QUIET" != "true" ]]; then
+        if [[ "$SHOW_TIMESTAMPS" == "true" ]]; then
+            echo "$(date '+%H:%M:%S') [VERBOSE] $*" >&2
+        else
+            echo "[VERBOSE] $*" >&2
+        fi
+    fi
+}
+
+log_warning() {
+    if [[ "$QUIET" != "true" ]]; then
+        if [[ "$SHOW_TIMESTAMPS" == "true" ]]; then
+            echo "$(date '+%H:%M:%S') [WARNING] $*" >&2
+        else
+            echo "WARNING: $*" >&2
+        fi
+    fi
+}
+
+log_error() {
+    if [[ "$SHOW_TIMESTAMPS" == "true" ]]; then
+        echo "$(date '+%H:%M:%S') [ERROR] $*" >&2
+    else
+        echo "ERROR: $*" >&2
+    fi
+}
+
+log_success() {
+    if [[ "$QUIET" != "true" ]]; then
+        if [[ "$SHOW_TIMESTAMPS" == "true" ]]; then
+            echo "$(date '+%H:%M:%S') [SUCCESS] ✓ $*"
+        else
+            echo "✓ $*"
+        fi
+    fi
+}
+
+# Progress indicator for long operations
+show_progress() {
+    local current="$1"
+    local total="$2"
+    local operation="$3"
+    
+    if [[ "$QUIET" != "true" ]]; then
+        local percentage=$((current * 100 / total))
+        printf "\r[%d/%d] (%d%%) %s" "$current" "$total" "$percentage" "$operation"
+        if [[ $current -eq $total ]]; then
+            echo ""  # New line after completion
+        fi
+    fi
+}
+
 usage() {
-    echo "Usage: $0 [--dry-run] {pull|push|backup-stats|backup-cleanup}"
+    echo "Usage: $0 [options] {pull|push|backup-stats|backup-cleanup}"
     echo ""
+    echo "Operations:"
     echo "  pull           - Copy configs from system to repository"
     echo "  push           - Copy configs from repository to system"
     echo "  backup-stats   - Show backup statistics and disk usage"
     echo "  backup-cleanup - Clean up old backups based on retention policy"
+    echo ""
+    echo "Options:"
     echo "  --dry-run      - Preview operations without making changes"
+    echo "  -v, --verbose  - Show detailed operation information"
+    echo "  -q, --quiet    - Minimize output (errors only)"
+    echo "  --no-timestamp - Disable timestamps in log output"
+    echo "  -h, --help     - Show this help message"
     echo ""
     echo "Configurations managed:"
     echo "  - Claude config (claude.md, agents/, commands/ from ~/.claude/)"
@@ -321,10 +403,10 @@ usage() {
     echo "  - Ghostty config (~/Library/Application Support/com.mitchellh.ghostty/config)"
     echo ""
     echo "Examples:"
-    echo "  $0 pull                    # Sync from system to repo"
-    echo "  $0 --dry-run push          # Preview push operations"
-    echo "  $0 backup-stats            # Show backup information"
-    echo "  $0 --dry-run backup-cleanup # Preview backup cleanup"
+    echo "  $0 pull                     # Sync from system to repo"
+    echo "  $0 --dry-run --verbose push # Preview push with details"
+    echo "  $0 -q backup-cleanup        # Clean backups quietly"
+    echo "  $0 --no-timestamp pull      # Sync without timestamps"
     echo ""
     echo "Backup Configuration:"
     echo "  Retention: $BACKUP_RETENTION_DAYS days"
@@ -383,11 +465,12 @@ sync_config() {
     local type="$4"
     local mode="$5"
     
-    echo "Syncing $name config..."
+    log_info "Syncing $name config..."
+    log_verbose "  Mode: $mode, Type: $type"
     
     # Validate paths before proceeding
     if ! validate_paths "$system_path" "$repo_path" "$mode"; then
-        echo "  ⚠ Skipping $name due to validation errors"
+        log_warning "Skipping $name due to validation errors"
         return 1
     fi
     
@@ -397,33 +480,34 @@ sync_config() {
         
         # Create backup if target exists
         if [[ -e "$repo_path" ]]; then
+            log_verbose "Target exists, creating backup first"
             if ! create_backup "$repo_path" "${name}_repo"; then
-                echo "  ERROR: Failed to create backup for $repo_path" >&2
+                log_error "Failed to create backup for $repo_path"
                 return 1
             fi
         fi
         
         # Perform copy operation
         if [[ "$type" == "dir" ]]; then
-            echo "  Copying directory: $system_path -> $repo_path"
+            log_verbose "Copying directory: $system_path -> $repo_path"
             if ! dry_run_execute "Remove existing directory" "rm -rf \"$repo_path\""; then
-                echo "  ERROR: Failed to remove existing directory: $repo_path" >&2
+                log_error "Failed to remove existing directory: $repo_path"
                 return 1
             fi
             if ! dry_run_execute "Copy directory" "cp -r \"$system_path\" \"$repo_path\""; then
-                echo "  ERROR: Failed to copy directory: $system_path -> $repo_path" >&2
+                log_error "Failed to copy directory: $system_path -> $repo_path"
                 return 1
             fi
         else
-            echo "  Copying file: $system_path -> $repo_path"
+            log_verbose "Copying file: $system_path -> $repo_path"
             local repo_parent_dir
             repo_parent_dir="$(dirname "$repo_path")"
             if ! dry_run_execute "Create parent directory" "mkdir -p \"$repo_parent_dir\""; then
-                echo "  ERROR: Failed to create parent directory for: $repo_path" >&2
+                log_error "Failed to create parent directory for: $repo_path"
                 return 1
             fi
             if ! dry_run_execute "Copy file" "cp \"$system_path\" \"$repo_path\""; then
-                echo "  ERROR: Failed to copy file: $system_path -> $repo_path" >&2
+                log_error "Failed to copy file: $system_path -> $repo_path"
                 return 1
             fi
         fi
@@ -433,48 +517,49 @@ sync_config() {
         
         # Create backup if target exists
         if [[ -e "$system_path" ]]; then
+            log_verbose "Target exists, creating backup first"
             if ! create_backup "$system_path" "${name}_system"; then
-                echo "  ERROR: Failed to create backup for $system_path" >&2
+                log_error "Failed to create backup for $system_path"
                 return 1
             fi
         fi
         
         # Perform copy operation
         if [[ "$type" == "dir" ]]; then
-            echo "  Copying directory: $repo_path -> $system_path"
+            log_verbose "Copying directory: $repo_path -> $system_path"
             if ! dry_run_execute "Remove existing directory" "rm -rf \"$system_path\""; then
-                echo "  ERROR: Failed to remove existing directory: $system_path" >&2
+                log_error "Failed to remove existing directory: $system_path"
                 return 1
             fi
             local system_parent_dir
             system_parent_dir="$(dirname "$system_path")"
             if ! dry_run_execute "Create parent directory" "mkdir -p \"$system_parent_dir\""; then
-                echo "  ERROR: Failed to create parent directory for: $system_path" >&2
+                log_error "Failed to create parent directory for: $system_path"
                 return 1
             fi
             if ! dry_run_execute "Copy directory" "cp -r \"$repo_path\" \"$system_path\""; then
-                echo "  ERROR: Failed to copy directory: $repo_path -> $system_path" >&2
+                log_error "Failed to copy directory: $repo_path -> $system_path"
                 return 1
             fi
         else
-            echo "  Copying file: $repo_path -> $system_path"
+            log_verbose "Copying file: $repo_path -> $system_path"
             local system_parent_dir2
             system_parent_dir2="$(dirname "$system_path")"
             if ! dry_run_execute "Create parent directory" "mkdir -p \"$system_parent_dir2\""; then
-                echo "  ERROR: Failed to create parent directory for: $system_path" >&2
+                log_error "Failed to create parent directory for: $system_path"
                 return 1
             fi
             if ! dry_run_execute "Copy file" "cp \"$repo_path\" \"$system_path\""; then
-                echo "  ERROR: Failed to copy file: $repo_path -> $system_path" >&2
+                log_error "Failed to copy file: $repo_path -> $system_path"
                 return 1
             fi
         fi
     fi
     
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "  [DRY-RUN] Would complete: $name config sync"
+        log_info "[DRY-RUN] Would complete: $name config sync"
     else
-        echo "  ✓ $name config synced successfully"
+        log_success "$name config synced successfully"
     fi
     return 0
 }
@@ -482,97 +567,119 @@ sync_config() {
 main() {
     local mode=""
     
-    # Parse arguments for dry-run flag and mode
+    # Parse arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
             --dry-run)
                 DRY_RUN=true
                 shift
                 ;;
-            pull|push)
+            -v|--verbose)
+                VERBOSE=true
+                shift
+                ;;
+            -q|--quiet)
+                QUIET=true
+                shift
+                ;;
+            --no-timestamp)
+                SHOW_TIMESTAMPS=false
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            pull|push|backup-stats|backup-cleanup)
                 mode="$1"
                 shift
                 ;;
-            backup-stats)
-                mode="backup-stats"
-                shift
-                ;;
-            backup-cleanup)
-                mode="backup-cleanup"
-                shift
-                ;;
             *)
-                echo "ERROR: Unknown argument '$1'" >&2
+                log_error "Unknown argument '$1'"
                 usage
                 exit 1
                 ;;
         esac
     done
     
+    # Validate conflicting options
+    if [[ "$VERBOSE" == "true" ]] && [[ "$QUIET" == "true" ]]; then
+        log_error "Cannot use --verbose and --quiet together"
+        exit 1
+    fi
+    
     # Validate required mode argument
     if [[ -z "$mode" ]]; then
-        echo "ERROR: Mode is required" >&2
+        log_error "Mode is required"
         usage
         exit 1
     fi
     
     # Handle backup management commands
     if [[ "$mode" == "backup-stats" ]]; then
-        echo "=== Backup Statistics ==="
+        log_info "=== Backup Statistics ==="
         show_backup_stats
         return 0
     elif [[ "$mode" == "backup-cleanup" ]]; then
-        echo "=== Backup Cleanup ==="
+        log_info "=== Backup Cleanup ==="
         if [[ "$DRY_RUN" == "true" ]]; then
-            echo "DRY-RUN mode - no backups will actually be removed"
+            log_info "DRY-RUN mode - no backups will actually be removed"
         fi
         cleanup_old_backups
         return 0
     fi
     
-    # Display mode information
-    echo "=== Config Sync Tool ==="
+    # Display mode information for sync operations
+    log_info "=== Config Sync Tool ==="
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "Mode: $mode (DRY-RUN - no changes will be made)"
+        log_info "Mode: $mode (DRY-RUN - no changes will be made)"
     else
-        echo "Mode: $mode"
+        log_info "Mode: $mode"
     fi
-    echo "Repository: $SCRIPT_DIR"
-    echo ""
+    log_info "Repository: $SCRIPT_DIR"
+    if [[ "$VERBOSE" == "true" ]]; then
+        log_verbose "Backup directory: $BACKUP_DIR"
+        log_verbose "Retention policy: $BACKUP_RETENTION_DAYS days, max $BACKUP_MAX_COUNT files"
+    fi
     
-    # Validate all mappings before starting
+    # Validate all mappings before starting sync
     validate_all_mappings
-    echo ""
     
     local success_count=0
     local total_count=${#CONFIG_MAPPINGS[@]}
     
-    for mapping in "${CONFIG_MAPPINGS[@]}"; do
+    for i in "${!CONFIG_MAPPINGS[@]}"; do
+        local mapping="${CONFIG_MAPPINGS[i]}"
+        show_progress $((i + 1)) "$total_count" "Processing configurations..."
+        
         IFS=':' read -r name system_path repo_path type <<< "$mapping"
         if sync_config "$name" "$system_path" "$repo_path" "$type" "$mode"; then
             ((success_count++))
         fi
-        echo ""
+        
+        if [[ "$QUIET" != "true" ]]; then
+            echo ""  # Add spacing between configs
+        fi
     done
     
     # Run automatic backup cleanup after successful sync operations
     if [[ $success_count -gt 0 ]] && [[ "$DRY_RUN" != "true" ]]; then
-        echo "=== Automatic Backup Cleanup ==="
+        log_info "=== Automatic Backup Cleanup ==="
         cleanup_old_backups
-        echo ""
     fi
     
-    echo "=== Sync Summary ==="
+    # Final summary
+    log_info "=== Sync Summary ==="
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "DRY-RUN completed: $success_count/$total_count configurations would be synced"
-        echo "✓ No actual changes were made. Use without --dry-run to execute."
+        log_info "DRY-RUN completed: $success_count/$total_count configurations would be synced"
+        log_success "No actual changes were made. Use without --dry-run to execute."
     else
-        echo "Successful: $success_count/$total_count configurations"
+        log_info "Successful: $success_count/$total_count configurations"
         
         if [[ $success_count -eq $total_count ]]; then
-            echo "✓ All configurations synced successfully!"
+            log_success "All configurations synced successfully!"
         else
-            echo "⚠ Some configurations failed to sync. Check output above."
+            log_warning "Some configurations failed to sync. Check output above."
             exit 1
         fi
         
