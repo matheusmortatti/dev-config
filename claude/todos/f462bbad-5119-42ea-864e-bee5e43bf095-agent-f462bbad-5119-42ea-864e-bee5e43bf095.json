@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Create Source directory structure",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create pdxinfo metadata file",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Implement main.lua with basic game loop",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Add graphics initialization and display setup",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Add basic timer display placeholder",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Add input handling framework",
+    "status": "completed",
+    "priority": "low",
+    "id": "6"
+  }
+]

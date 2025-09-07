@@ -1,0 +1,87 @@
+[
+  {
+    "content": "Create scene.h header file with all function definitions",
+    "status": "completed",
+    "id": "1"
+  },
+  {
+    "content": "Create scene.c with empty function implementations",
+    "status": "completed",
+    "id": "2"
+  },
+  {
+    "content": "Create update_systems.h header file",
+    "status": "completed",
+    "id": "3"
+  },
+  {
+    "content": "Create update_systems.c with empty implementations",
+    "status": "completed",
+    "id": "4"
+  },
+  {
+    "content": "Create scene_manager.h header file",
+    "status": "completed",
+    "id": "5"
+  },
+  {
+    "content": "Create scene_manager.c with empty implementations",
+    "status": "completed",
+    "id": "6"
+  },
+  {
+    "content": "Create test_scene.c with all unit tests",
+    "status": "completed",
+    "id": "7"
+  },
+  {
+    "content": "Create test_scene_perf.c with performance tests",
+    "status": "completed",
+    "id": "8"
+  },
+  {
+    "content": "Run initial tests to verify they fail",
+    "status": "completed",
+    "id": "9"
+  },
+  {
+    "content": "Implement scene creation and destruction functions",
+    "status": "completed",
+    "id": "10"
+  },
+  {
+    "content": "Implement scene state management functions",
+    "status": "completed",
+    "id": "11"
+  },
+  {
+    "content": "Implement GameObject management functions",
+    "status": "completed",
+    "id": "12"
+  },
+  {
+    "content": "Implement component system functions",
+    "status": "completed",
+    "id": "13"
+  },
+  {
+    "content": "Implement update systems batch processing",
+    "status": "completed",
+    "id": "14"
+  },
+  {
+    "content": "Implement scene manager functions",
+    "status": "completed",
+    "id": "15"
+  },
+  {
+    "content": "Run tests and iterate until all pass",
+    "status": "completed",
+    "id": "16"
+  },
+  {
+    "content": "Update Success Criteria checkboxes in phase-4 document",
+    "status": "completed",
+    "id": "17"
+  }
+]

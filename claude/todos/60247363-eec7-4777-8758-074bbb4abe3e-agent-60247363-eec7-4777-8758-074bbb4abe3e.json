@@ -1,0 +1,14 @@
+[
+  {
+    "content": "Fix crank indicator to use correct draw() method",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Test the corrected crank indicator implementation",
+    "status": "completed",
+    "priority": "medium",
+    "id": "2"
+  }
+]

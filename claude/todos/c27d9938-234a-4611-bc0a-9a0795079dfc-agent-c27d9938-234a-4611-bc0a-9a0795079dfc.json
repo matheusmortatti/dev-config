@@ -1,0 +1,20 @@
+[
+  {
+    "content": "Create checkered pattern array for background",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Modify main.lua to use setPattern for checkered background",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Test the implementation by building and running",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  }
+]

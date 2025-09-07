@@ -1,0 +1,57 @@
+[
+  {
+    "content": "Complete Scene Manager implementation (scene_manager.c)",
+    "status": "completed",
+    "id": "1"
+  },
+  {
+    "content": "Implement scene manager create/destroy functions",
+    "status": "completed",
+    "id": "2"
+  },
+  {
+    "content": "Implement scene add/remove/find functions",
+    "status": "completed",
+    "id": "3"
+  },
+  {
+    "content": "Implement active scene management",
+    "status": "completed",
+    "id": "4"
+  },
+  {
+    "content": "Implement scene manager update/render loops",
+    "status": "completed",
+    "id": "5"
+  },
+  {
+    "content": "Complete Update Systems implementation (update_systems.c)",
+    "status": "completed",
+    "id": "6"
+  },
+  {
+    "content": "Implement transform batch update system",
+    "status": "completed",
+    "id": "7"
+  },
+  {
+    "content": "Implement sprite batch update/render systems",
+    "status": "completed",
+    "id": "8"
+  },
+  {
+    "content": "Implement collision batch update system",
+    "status": "completed",
+    "id": "9"
+  },
+  {
+    "content": "Complete scene helper functions in scene.c",
+    "status": "completed",
+    "id": "10"
+  },
+  {
+    "content": "Run tests to validate implementation",
+    "status": "completed",
+    "id": "11"
+  }
+]

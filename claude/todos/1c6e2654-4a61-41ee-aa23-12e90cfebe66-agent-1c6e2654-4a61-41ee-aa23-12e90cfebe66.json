@@ -1,0 +1,80 @@
+[
+  {
+    "content": "Create tasks directory structure",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create 01-memory-constants.md task specification",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create 02-palette-management.md task specification",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Create 03-vram-management.md task specification",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Create 04-oam-sprite-system.md task specification",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Create 05-sprite-animation.md task specification",
+    "status": "completed",
+    "priority": "medium",
+    "id": "6"
+  },
+  {
+    "content": "Create 06-tile-system.md task specification",
+    "status": "completed",
+    "priority": "medium",
+    "id": "7"
+  },
+  {
+    "content": "Create 07-background-management.md task specification",
+    "status": "completed",
+    "priority": "medium",
+    "id": "8"
+  },
+  {
+    "content": "Create 08-dma-utilities.md task specification",
+    "status": "completed",
+    "priority": "medium",
+    "id": "9"
+  },
+  {
+    "content": "Create 09-timer-utilities.md task specification",
+    "status": "completed",
+    "priority": "medium",
+    "id": "10"
+  },
+  {
+    "content": "Create 10-sound-system.md task specification",
+    "status": "completed",
+    "priority": "low",
+    "id": "11"
+  },
+  {
+    "content": "Create 11-special-effects.md task specification",
+    "status": "completed",
+    "priority": "low",
+    "id": "12"
+  },
+  {
+    "content": "Create 12-game-framework.md task specification",
+    "status": "completed",
+    "priority": "low",
+    "id": "13"
+  }
+]

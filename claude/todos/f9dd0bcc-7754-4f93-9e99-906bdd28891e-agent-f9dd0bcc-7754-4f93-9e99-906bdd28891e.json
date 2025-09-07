@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Format phase-8-lua-bindings.md - break up large code blocks and improve spacing",
+    "status": "completed",
+    "priority": "high",
+    "id": "format_phase8"
+  },
+  {
+    "content": "Format phase-9-build-system.md - organize CMake and script sections",
+    "status": "completed",
+    "priority": "high",
+    "id": "format_phase9"
+  },
+  {
+    "content": "Format phase-10-optimization.md - improve performance code examples organization",
+    "status": "completed",
+    "priority": "high",
+    "id": "format_phase10"
+  },
+  {
+    "content": "Format phase-11-integration-examples.md - better structure for game examples",
+    "status": "completed",
+    "priority": "high",
+    "id": "format_phase11"
+  },
+  {
+    "content": "Format README.md - minor formatting improvements for consistency",
+    "status": "completed",
+    "priority": "medium",
+    "id": "format_readme"
+  }
+]

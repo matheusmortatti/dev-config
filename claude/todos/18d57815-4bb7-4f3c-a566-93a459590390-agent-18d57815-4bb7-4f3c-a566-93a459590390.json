@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Create ghost piece calculation function",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Add ghost piece rendering with outline/dashed style",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Integrate ghost piece into main draw loop",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  },
+  {
+    "content": "Test ghost piece display",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  }
+]

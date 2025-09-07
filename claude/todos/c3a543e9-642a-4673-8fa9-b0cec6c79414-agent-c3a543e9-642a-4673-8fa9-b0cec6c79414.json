@@ -1,0 +1,68 @@
+[
+  {
+    "content": "Create game_object.h with complete GameObject interface and 64-byte structure",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create game_object.c with empty function stubs",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create mock_scene.h/.c for testing GameObject without Phase 4 dependencies",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Update transform_component.h to add matrix[6] and scale fields per spec",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Update transform_component.c with complete matrix calculation including scale",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  },
+  {
+    "content": "Create test_game_object.c with comprehensive test suite",
+    "status": "completed",
+    "priority": "high",
+    "id": "6"
+  },
+  {
+    "content": "Update test_transform.c to test enhanced functionality",
+    "status": "pending",
+    "priority": "medium",
+    "id": "7"
+  },
+  {
+    "content": "Create test_gameobject_perf.c with performance benchmarks",
+    "status": "completed",
+    "priority": "medium",
+    "id": "8"
+  },
+  {
+    "content": "Implement GameObject functions iteratively until all tests pass",
+    "status": "completed",
+    "priority": "high",
+    "id": "9"
+  },
+  {
+    "content": "Update Makefile with GameObject test targets",
+    "status": "completed",
+    "priority": "medium",
+    "id": "10"
+  },
+  {
+    "content": "Verify all success criteria checkboxes in phase-3-gameobject-transform.md",
+    "status": "completed",
+    "priority": "medium",
+    "id": "11"
+  }
+]

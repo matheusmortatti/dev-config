@@ -1,0 +1,32 @@
+[
+  {
+    "content": "Initialize git repository in current directory",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Add remote origin pointing to GitHub repository",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Stage all current files for initial commit",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Create initial commit with current project state",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  },
+  {
+    "content": "Push initial commit to GitHub repository",
+    "status": "completed",
+    "priority": "high",
+    "id": "5"
+  }
+]

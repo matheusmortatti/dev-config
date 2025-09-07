@@ -1,0 +1,38 @@
+[
+  {
+    "content": "Create vertex.rs module for Vertex struct and geometry data",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Create uniforms.rs module for transformation matrices",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Create shader.rs module for WGSL shader source",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Create gpu_context.rs module for GPU context management",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  },
+  {
+    "content": "Create app.rs module for application handler",
+    "status": "completed",
+    "priority": "medium",
+    "id": "5"
+  },
+  {
+    "content": "Update main.rs to use the new modules",
+    "status": "completed",
+    "priority": "low",
+    "id": "6"
+  }
+]

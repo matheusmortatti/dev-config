@@ -1,0 +1,18 @@
+{
+    "mcpServers": {
+      "pdf-reader": {
+        "type": "stdio",
+        "command": "docker",
+        "args": [
+          "run",
+          "-i",
+          "--rm",
+          "-v",
+          "/Users/matheusmortatti/Documents/pdfs:/pdfs",
+          "mcp/pdf-reader"
+        ],
+        "disabled": false,
+        "autoApprove": []
+      }
+    }
+  }

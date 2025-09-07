@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Fix missing letters in title screen text",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Fix missing letters in game over screen text",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Fix missing letters in gameplay UI text",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Build and test the text rendering fixes",
+    "status": "completed",
+    "priority": "high",
+    "id": "4"
+  }
+]

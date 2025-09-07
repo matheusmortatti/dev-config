@@ -1,0 +1,20 @@
+[
+  {
+    "content": "Copy the key.wav sound file from SDK to project",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Replace synth approach with sound file playback",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Test the sound file implementation",
+    "status": "completed",
+    "priority": "medium",
+    "id": "3"
+  }
+]

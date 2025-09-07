@@ -1,0 +1,14 @@
+[
+  {
+    "content": "Read ARM Cortex-M7 TRM PDF to extract relevant processor information",
+    "status": "in_progress",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Add ARM Cortex-M7 technical specifications to CLAUDE.md",
+    "status": "pending",
+    "priority": "high",
+    "id": "2"
+  }
+]

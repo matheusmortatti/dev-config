@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Create Source/fonts/ directory",
+    "status": "completed",
+    "priority": "high",
+    "id": "1"
+  },
+  {
+    "content": "Copy Mikodacs-Clock font files from SDK to project",
+    "status": "completed",
+    "priority": "high",
+    "id": "2"
+  },
+  {
+    "content": "Fix font loading path in main.lua",
+    "status": "completed",
+    "priority": "high",
+    "id": "3"
+  },
+  {
+    "content": "Test font loading by rebuilding and running",
+    "status": "completed",
+    "priority": "medium",
+    "id": "4"
+  }
+]
