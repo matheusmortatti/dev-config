@@ -1991,17 +1991,17 @@ main() {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] List backups shows all available backups: `./sync-configs.sh list-backups`
-- [ ] Rollback from specific backup works: Create backup, modify config, rollback, verify restoration
-- [ ] Config-specific rollback works: `./sync-configs.sh rollback-config claude-md`
-- [ ] Dry-run rollback doesn't modify files: `./sync-configs.sh --dry-run rollback <backup>`
+- [x] List backups shows all available backups: `./sync-configs.sh list-backups`
+- [x] Rollback from specific backup works: Create backup, modify config, rollback, verify restoration
+- [x] Config-specific rollback works: `./sync-configs.sh rollback-config claude-md`
+- [x] Dry-run rollback doesn't modify files: `./sync-configs.sh --dry-run rollback <backup>`
 
 #### Manual Verification:
-- [ ] Interactive rollback provides clear prompts and confirmation
-- [ ] Rollback creates backup of current state before restoring
-- [ ] Error handling works for invalid backup names
-- [ ] Backup parsing correctly extracts config name, location, and timestamp
-- [ ] Rollback operations are logged with appropriate detail levels
+- [x] Interactive rollback provides clear prompts and confirmation
+- [x] Rollback creates backup of current state before restoring
+- [x] Error handling works for invalid backup names
+- [x] Backup parsing correctly extracts config name, location, and timestamp
+- [x] Rollback operations are logged with appropriate detail levels
 
 ---
 

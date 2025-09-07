@@ -381,21 +381,298 @@ show_progress() {
     fi
 }
 
+# List available backups for rollback
+list_available_backups() {
+    if [[ ! -d "$BACKUP_DIR" ]]; then
+        log_info "No backup directory found"
+        return 1
+    fi
+    
+    local backup_files=()
+    while IFS= read -r backup_file; do
+        if [[ -n "$backup_file" ]]; then
+            backup_files+=("$backup_file")
+        fi
+    done < <(list_backup_files)
+    
+    if [[ ${#backup_files[@]} -eq 0 ]]; then
+        log_info "No backups found"
+        return 1
+    fi
+    
+    log_info "Available backups (newest first):"
+    for ((i=${#backup_files[@]}-1; i>=0; i--)); do
+        local backup_file="${backup_files[i]}"
+        local backup_name
+        backup_name=$(basename "$backup_file")
+        local timestamp
+        timestamp=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$backup_file" 2>/dev/null || echo "unknown")
+        local size="unknown"
+        
+        if [[ -f "$backup_file" ]]; then
+            size=$(stat -f%z "$backup_file" 2>/dev/null | awk '{printf "%.1fKB", $1/1024}' || echo "unknown")
+        elif [[ -d "$backup_file" ]]; then
+            size=$(du -sh "$backup_file" 2>/dev/null | cut -f1 || echo "unknown")
+        fi
+        
+        printf "  %-40s %s (%s)\\n" "$backup_name" "$timestamp" "$size"
+    done
+}
+
+# Parse backup filename to extract metadata
+parse_backup_name() {
+    local backup_name="$1"
+    local config_name=""
+    local location=""
+    local timestamp=""
+    
+    # Expected format: configname_location_YYYYMMDD_HHMMSS
+    if [[ "$backup_name" =~ ^(.+)_(system|repo)_([0-9]{8}_[0-9]{6})$ ]]; then
+        config_name="${BASH_REMATCH[1]}"
+        location="${BASH_REMATCH[2]}"
+        timestamp="${BASH_REMATCH[3]}"
+        
+        echo "$config_name:$location:$timestamp"
+        return 0
+    fi
+    
+    log_error "Invalid backup name format: $backup_name"
+    return 1
+}
+
+# Find original path for a backup
+find_original_path() {
+    local config_name="$1"
+    local location="$2"
+    
+    # Search through CONFIG_MAPPINGS to find the matching config
+    for mapping in "${CONFIG_MAPPINGS[@]}"; do
+        IFS=':' read -r name system_path repo_path type <<< "$mapping"
+        if [[ "$name" == "$config_name" ]]; then
+            if [[ "$location" == "system" ]]; then
+                echo "$system_path"
+                return 0
+            elif [[ "$location" == "repo" ]]; then
+                echo "$repo_path"
+                return 0
+            fi
+        fi
+    done
+    
+    log_error "Could not find original path for config: $config_name"
+    return 1
+}
+
+# Perform rollback operation
+rollback_from_backup() {
+    local backup_path="$1"
+    local backup_name
+    backup_name=$(basename "$backup_path")
+    
+    log_info "Rolling back from backup: $backup_name"
+    
+    # Parse backup metadata
+    local backup_info
+    if ! backup_info=$(parse_backup_name "$backup_name"); then
+        return 1
+    fi
+    
+    IFS=':' read -r config_name location timestamp <<< "$backup_info"
+    
+    # Find original path
+    local original_path
+    if ! original_path=$(find_original_path "$config_name" "$location"); then
+        return 1
+    fi
+    
+    log_verbose "Config: $config_name, Location: $location, Timestamp: $timestamp"
+    log_verbose "Restoring to: $original_path"
+    
+    # Verify backup exists and is readable
+    if [[ ! -e "$backup_path" ]]; then
+        log_error "Backup not found: $backup_path"
+        return 1
+    fi
+    
+    if [[ ! -r "$backup_path" ]]; then
+        log_error "Cannot read backup: $backup_path"
+        return 1
+    fi
+    
+    # Create a backup of current state before rollback
+    if [[ -e "$original_path" ]]; then
+        log_verbose "Creating backup of current state before rollback"
+        if ! create_backup "$original_path" "${config_name}_${location}_prerollback"; then
+            log_error "Failed to backup current state, aborting rollback"
+            return 1
+        fi
+    fi
+    
+    # Perform the rollback
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_info "[DRY-RUN] Would restore: $backup_path -> $original_path"
+        if [[ -d "$backup_path" ]]; then
+            log_info "[DRY-RUN] Would remove existing directory: $original_path"
+            log_info "[DRY-RUN] Would copy directory: $backup_path -> $original_path"
+        else
+            log_info "[DRY-RUN] Would copy file: $backup_path -> $original_path"
+        fi
+    else
+        if [[ -d "$backup_path" ]]; then
+            log_verbose "Restoring directory: $backup_path -> $original_path"
+            if ! rm -rf "$original_path" 2>/dev/null; then
+                log_error "Failed to remove existing directory: $original_path"
+                return 1
+            fi
+            if ! mkdir -p "$(dirname "$original_path")"; then
+                log_error "Failed to create parent directory for: $original_path"
+                return 1
+            fi
+            if ! cp -r "$backup_path" "$original_path"; then
+                log_error "Failed to restore directory: $backup_path -> $original_path"
+                return 1
+            fi
+        else
+            log_verbose "Restoring file: $backup_path -> $original_path"
+            if ! mkdir -p "$(dirname "$original_path")"; then
+                log_error "Failed to create parent directory for: $original_path"
+                return 1
+            fi
+            if ! cp "$backup_path" "$original_path"; then
+                log_error "Failed to restore file: $backup_path -> $original_path"
+                return 1
+            fi
+        fi
+        
+        log_success "Rollback completed: $config_name restored from $backup_name"
+    fi
+    
+    return 0
+}
+
+# Interactive rollback selection
+interactive_rollback() {
+    log_info "=== Interactive Rollback ==="
+    
+    if ! list_available_backups; then
+        return 1
+    fi
+    
+    echo ""
+    read -p "Enter backup name to restore from (or 'cancel' to abort): " backup_name
+    
+    if [[ "$backup_name" == "cancel" ]] || [[ -z "$backup_name" ]]; then
+        log_info "Rollback cancelled"
+        return 0
+    fi
+    
+    local backup_path="$BACKUP_DIR/$backup_name"
+    if [[ ! -e "$backup_path" ]]; then
+        log_error "Backup not found: $backup_name"
+        return 1
+    fi
+    
+    # Show what will be restored
+    local backup_info
+    if backup_info=$(parse_backup_name "$backup_name"); then
+        IFS=':' read -r config_name location timestamp <<< "$backup_info"
+        local original_path
+        if original_path=$(find_original_path "$config_name" "$location"); then
+            log_info "This will restore:"
+            log_info "  Config: $config_name"
+            log_info "  Location: $location"
+            log_info "  Target: $original_path"
+            log_info "  Backup timestamp: $timestamp"
+            echo ""
+            read -p "Are you sure? (y/N): " confirm
+            
+            if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                rollback_from_backup "$backup_path"
+            else
+                log_info "Rollback cancelled"
+            fi
+        fi
+    fi
+}
+
+# Rollback specific config to latest backup
+rollback_config() {
+    local config_name="$1"
+    local location="${2:-}"  # Optional location
+    
+    log_info "Rolling back $config_name to latest backup..."
+    
+    # Find the most recent backup for this config (check both system and repo if location not specified)
+    local latest_backup=""
+    local latest_timestamp=0
+    local backup_location=""
+    
+    if [[ -d "$BACKUP_DIR" ]]; then
+        # If location specified, only search that location
+        local locations=()
+        if [[ -n "$location" ]]; then
+            locations=("$location")
+        else
+            # Search both system and repo backups
+            locations=("system" "repo")
+        fi
+        
+        for loc in "${locations[@]}"; do
+            local pattern="${config_name}_${loc}_[0-9]*_[0-9]*"
+            while IFS= read -r -d '' backup_file; do
+                local backup_name
+                backup_name=$(basename "$backup_file")
+                local timestamp_str=""
+                
+                if [[ "$backup_name" =~ _([0-9]{8}_[0-9]{6})$ ]]; then
+                    timestamp_str="${BASH_REMATCH[1]}"
+                    # Convert to comparable format (remove underscores)
+                    local comparable_timestamp="${timestamp_str//_/}"
+                    
+                    if [[ $comparable_timestamp -gt $latest_timestamp ]]; then
+                        latest_timestamp=$comparable_timestamp
+                        latest_backup="$backup_file"
+                        backup_location="$loc"
+                    fi
+                fi
+            done < <(find "$BACKUP_DIR" -name "$pattern" -print0 2>/dev/null)
+        done
+    fi
+    
+    if [[ -z "$latest_backup" ]]; then
+        if [[ -n "$location" ]]; then
+            log_error "No backups found for config: $config_name ($location)"
+        else
+            log_error "No backups found for config: $config_name"
+        fi
+        return 1
+    fi
+    
+    log_info "Found latest backup: $(basename "$latest_backup") (location: $backup_location)"
+    rollback_from_backup "$latest_backup"
+}
+
 usage() {
-    echo "Usage: $0 [options] {pull|push|backup-stats|backup-cleanup}"
+    echo "Usage: $0 [options] {pull|push|backup-stats|backup-cleanup|rollback|list-backups}"
     echo ""
     echo "Operations:"
-    echo "  pull           - Copy configs from system to repository"
-    echo "  push           - Copy configs from repository to system"
-    echo "  backup-stats   - Show backup statistics and disk usage"
-    echo "  backup-cleanup - Clean up old backups based on retention policy"
+    echo "  pull            - Copy configs from system to repository"
+    echo "  push            - Copy configs from repository to system"
+    echo "  backup-stats    - Show backup statistics and disk usage"
+    echo "  backup-cleanup  - Clean up old backups based on retention policy"
+    echo "  rollback        - Interactive rollback from available backups"
+    echo "  list-backups    - List all available backups"
+    echo ""
+    echo "Rollback Operations:"
+    echo "  rollback [backup-name]     - Restore from specific backup"
+    echo "  rollback-config <config>   - Restore config to latest backup"
     echo ""
     echo "Options:"
-    echo "  --dry-run      - Preview operations without making changes"
-    echo "  -v, --verbose  - Show detailed operation information"
-    echo "  -q, --quiet    - Minimize output (errors only)"
-    echo "  --no-timestamp - Disable timestamps in log output"
-    echo "  -h, --help     - Show this help message"
+    echo "  --dry-run       - Preview operations without making changes"
+    echo "  -v, --verbose   - Show detailed operation information"
+    echo "  -q, --quiet     - Minimize output (errors only)"
+    echo "  --no-timestamp  - Disable timestamps in log output"
+    echo "  -h, --help      - Show this help message"
     echo ""
     echo "Configurations managed:"
     echo "  - Claude config (claude.md, agents/, commands/ from ~/.claude/)"
@@ -403,10 +680,12 @@ usage() {
     echo "  - Ghostty config (~/Library/Application Support/com.mitchellh.ghostty/config)"
     echo ""
     echo "Examples:"
-    echo "  $0 pull                     # Sync from system to repo"
-    echo "  $0 --dry-run --verbose push # Preview push with details"
-    echo "  $0 -q backup-cleanup        # Clean backups quietly"
-    echo "  $0 --no-timestamp pull      # Sync without timestamps"
+    echo "  $0 pull                                    # Sync from system to repo"
+    echo "  $0 --dry-run --verbose push               # Preview push with details"
+    echo "  $0 rollback                               # Interactive rollback"
+    echo "  $0 rollback claude-md_system_20240107_143022  # Specific rollback"
+    echo "  $0 rollback-config claude-md              # Restore claude-md to latest backup"
+    echo "  $0 list-backups                           # Show available backups"
     echo ""
     echo "Backup Configuration:"
     echo "  Retention: $BACKUP_RETENTION_DAYS days"
@@ -566,6 +845,8 @@ sync_config() {
 
 main() {
     local mode=""
+    local rollback_target=""
+    local config_name=""
     
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -590,9 +871,31 @@ main() {
                 usage
                 exit 0
                 ;;
-            pull|push|backup-stats|backup-cleanup)
+            pull|push|backup-stats|backup-cleanup|list-backups)
                 mode="$1"
                 shift
+                ;;
+            rollback)
+                mode="rollback"
+                shift
+                # Check if specific backup name provided
+                if [[ $# -gt 0 ]] && [[ ! "$1" =~ ^- ]]; then
+                    rollback_target="$1"
+                    shift
+                fi
+                ;;
+            rollback-config)
+                mode="rollback-config"
+                shift
+                # Require config name
+                if [[ $# -gt 0 ]] && [[ ! "$1" =~ ^- ]]; then
+                    config_name="$1"
+                    shift
+                else
+                    log_error "rollback-config requires a config name"
+                    usage
+                    exit 1
+                fi
                 ;;
             *)
                 log_error "Unknown argument '$1'"
@@ -615,19 +918,45 @@ main() {
         exit 1
     fi
     
-    # Handle backup management commands
-    if [[ "$mode" == "backup-stats" ]]; then
-        log_info "=== Backup Statistics ==="
-        show_backup_stats
-        return 0
-    elif [[ "$mode" == "backup-cleanup" ]]; then
-        log_info "=== Backup Cleanup ==="
-        if [[ "$DRY_RUN" == "true" ]]; then
-            log_info "DRY-RUN mode - no backups will actually be removed"
-        fi
-        cleanup_old_backups
-        return 0
-    fi
+    # Handle backup and rollback management commands
+    case "$mode" in
+        backup-stats)
+            log_info "=== Backup Statistics ==="
+            show_backup_stats
+            return 0
+            ;;
+        backup-cleanup)
+            log_info "=== Backup Cleanup ==="
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "DRY-RUN mode - no backups will actually be removed"
+            fi
+            cleanup_old_backups
+            return 0
+            ;;
+        list-backups)
+            list_available_backups
+            return 0
+            ;;
+        rollback)
+            if [[ -n "$rollback_target" ]]; then
+                # Specific backup rollback
+                local backup_path="$BACKUP_DIR/$rollback_target"
+                if [[ ! -e "$backup_path" ]]; then
+                    log_error "Backup not found: $rollback_target"
+                    exit 1
+                fi
+                rollback_from_backup "$backup_path"
+            else
+                # Interactive rollback
+                interactive_rollback
+            fi
+            return 0
+            ;;
+        rollback-config)
+            rollback_config "$config_name"
+            return 0
+            ;;
+    esac
     
     # Display mode information for sync operations
     log_info "=== Config Sync Tool ==="
