@@ -6,7 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKUP_DIR="$HOME/.config-backups"
 
 CONFIG_MAPPINGS=(
-    "claude:$HOME/.claude:$SCRIPT_DIR/claude:dir"
+    "claude-md:$HOME/.claude/claude.md:$SCRIPT_DIR/claude/claude.md:file"
+    "claude-agents:$HOME/.claude/agents:$SCRIPT_DIR/claude/agents:dir"
+    "claude-commands:$HOME/.claude/commands:$SCRIPT_DIR/claude/commands:dir"
     "tmux:$HOME/.tmux.conf:$SCRIPT_DIR/tmux.conf:file"
     "ghostty:$HOME/Library/Application Support/com.mitchellh.ghostty/config:$SCRIPT_DIR/ghostty-config:file"
 )
@@ -18,7 +20,7 @@ usage() {
     echo "  push  - Copy configs from repository to system"
     echo ""
     echo "Configurations managed:"
-    echo "  - Claude config (~/.claude/)"
+    echo "  - Claude config (claude.md, agents/, commands/ from ~/.claude/)"
     echo "  - Tmux config (~/.tmux.conf)"
     echo "  - Ghostty config (~/Library/Application Support/com.mitchellh.ghostty/config)"
 }

@@ -1,7 +1,0 @@
-[
-  {
-    "content": "Fix escaped newlines and malformed code blocks in sprite component documentation",
-    "status": "completed",
-    "id": "1"
-  }
-]
