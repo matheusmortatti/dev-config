@@ -18,13 +18,250 @@ VERBOSE=false
 QUIET=false
 SHOW_TIMESTAMPS=true
 
-CONFIG_MAPPINGS=(
-    "claude-md:$HOME/.claude/claude.md:$SCRIPT_DIR/claude/claude.md:file"
-    "claude-agents:$HOME/.claude/agents:$SCRIPT_DIR/claude/agents:dir"
-    "claude-commands:$HOME/.claude/commands:$SCRIPT_DIR/claude/commands:dir"
-    "tmux:$HOME/.tmux.conf:$SCRIPT_DIR/tmux.conf:file"
-    "ghostty:$HOME/Library/Application Support/com.mitchellh.ghostty/config:$SCRIPT_DIR/ghostty-config:file"
-)
+# Platform detection and configuration
+detect_platform() {
+    local platform=""
+    local os_name
+    os_name=$(uname -s)
+    
+    case "$os_name" in
+        Darwin*)
+            platform="macos"
+            ;;
+        Linux*)
+            platform="linux"
+            ;;
+        CYGWIN*|MINGW*|MSYS*)
+            platform="windows"
+            ;;
+        *)
+            platform="unknown"
+            ;;
+    esac
+    
+    echo "$platform"
+}
+
+PLATFORM=$(detect_platform)
+
+# Cross-platform path resolution
+resolve_home_directory() {
+    if [[ "$PLATFORM" == "windows" ]]; then
+        echo "${USERPROFILE:-${HOME}}"
+    else
+        echo "${HOME}"
+    fi
+}
+
+resolve_application_support() {
+    local app_name="$1"
+    local home_dir
+    home_dir=$(resolve_home_directory)
+    
+    case "$PLATFORM" in
+        macos)
+            echo "$home_dir/Library/Application Support/$app_name"
+            ;;
+        linux)
+            echo "${XDG_DATA_HOME:-$home_dir/.local/share}/$app_name"
+            ;;
+        windows)
+            echo "${APPDATA}/$app_name"
+            ;;
+        *)
+            echo "$home_dir/.local/share/$app_name"
+            ;;
+    esac
+}
+
+resolve_config_directory() {
+    local app_name="$1"
+    local home_dir
+    home_dir=$(resolve_home_directory)
+    
+    case "$PLATFORM" in
+        macos)
+            echo "$home_dir/.config/$app_name"
+            ;;
+        linux)
+            echo "${XDG_CONFIG_HOME:-$home_dir/.config}/$app_name"
+            ;;
+        windows)
+            echo "${APPDATA}/$app_name"
+            ;;
+        *)
+            echo "$home_dir/.config/$app_name"
+            ;;
+    esac
+}
+
+# Get platform-specific claude directory
+get_claude_directory() {
+    local home_dir
+    home_dir=$(resolve_home_directory)
+    echo "$home_dir/.claude"
+}
+
+# Get platform-specific ghostty config path
+get_ghostty_config_path() {
+    case "$PLATFORM" in
+        macos)
+            echo "$(resolve_application_support "com.mitchellh.ghostty")/config"
+            ;;
+        linux)
+            echo "$(resolve_config_directory "ghostty")/config"
+            ;;
+        windows)
+            echo "$(resolve_application_support "ghostty")/config"
+            ;;
+        *)
+            echo "$(resolve_config_directory "ghostty")/config"
+            ;;
+    esac
+}
+
+# Cross-platform file operations
+safe_copy_file() {
+    local source="$1"
+    local target="$2"
+    
+    # Create parent directory
+    if ! mkdir -p "$(dirname "$target")"; then
+        log_error "Failed to create parent directory for: $target"
+        return 1
+    fi
+    
+    # Platform-specific copy operations
+    case "$PLATFORM" in
+        windows)
+            # Use Windows-compatible copy on MinGW/MSYS
+            if command -v cp >/dev/null; then
+                cp "$source" "$target"
+            else
+                # Fallback to Windows copy command
+                copy "$(cygpath -w "$source")" "$(cygpath -w "$target")" >/dev/null
+            fi
+            ;;
+        *)
+            cp "$source" "$target"
+            ;;
+    esac
+}
+
+safe_copy_directory() {
+    local source="$1"
+    local target="$2"
+    
+    # Remove existing target
+    if ! rm -rf "$target" 2>/dev/null; then
+        log_error "Failed to remove existing directory: $target"
+        return 1
+    fi
+    
+    # Create parent directory
+    if ! mkdir -p "$(dirname "$target")"; then
+        log_error "Failed to create parent directory for: $target"
+        return 1
+    fi
+    
+    # Platform-specific directory copy
+    case "$PLATFORM" in
+        windows)
+            if command -v cp >/dev/null; then
+                cp -r "$source" "$target"
+            else
+                # Use Windows xcopy as fallback
+                xcopy "$(cygpath -w "$source")" "$(cygpath -w "$target")" /E /I /Q >/dev/null
+            fi
+            ;;
+        *)
+            cp -r "$source" "$target"
+            ;;
+    esac
+}
+
+# Get file modification time in consistent format across platforms
+get_file_mtime() {
+    local file_path="$1"
+    
+    case "$PLATFORM" in
+        macos)
+            stat -f "%m" "$file_path" 2>/dev/null
+            ;;
+        linux)
+            stat -c "%Y" "$file_path" 2>/dev/null
+            ;;
+        windows)
+            # Windows stat might not be available, use ls as fallback
+            if command -v stat >/dev/null; then
+                stat -c "%Y" "$file_path" 2>/dev/null
+            else
+                # Fallback to a basic timestamp
+                date +%s 2>/dev/null
+            fi
+            ;;
+        *)
+            stat -c "%Y" "$file_path" 2>/dev/null || date +%s
+            ;;
+    esac
+}
+
+# Get file size in bytes across platforms
+get_file_size() {
+    local file_path="$1"
+    
+    case "$PLATFORM" in
+        macos)
+            stat -f "%z" "$file_path" 2>/dev/null
+            ;;
+        linux)
+            stat -c "%s" "$file_path" 2>/dev/null
+            ;;
+        windows)
+            if command -v stat >/dev/null; then
+                stat -c "%s" "$file_path" 2>/dev/null
+            else
+                # Windows fallback
+                wc -c < "$file_path" 2>/dev/null
+            fi
+            ;;
+        *)
+            stat -c "%s" "$file_path" 2>/dev/null || wc -c < "$file_path" 2>/dev/null
+            ;;
+    esac
+}
+
+# Platform-aware configuration mappings
+setup_config_mappings() {
+    local home_dir
+    home_dir=$(resolve_home_directory)
+    local claude_dir
+    claude_dir=$(get_claude_directory)
+    local ghostty_config
+    ghostty_config=$(get_ghostty_config_path)
+    
+    CONFIG_MAPPINGS=(
+        "claude-md:$claude_dir/claude.md:$SCRIPT_DIR/claude/claude.md:file"
+        "claude-agents:$claude_dir/agents:$SCRIPT_DIR/claude/agents:dir"
+        "claude-commands:$claude_dir/commands:$SCRIPT_DIR/claude/commands:dir"
+        "tmux:$home_dir/.tmux.conf:$SCRIPT_DIR/tmux.conf:file"
+        "ghostty:$ghostty_config:$SCRIPT_DIR/ghostty-config:file"
+    )
+    
+    # Add platform-specific configurations
+    case "$PLATFORM" in
+        linux)
+            # Add Linux-specific configs here if needed
+            ;;
+        windows)
+            # Add Windows-specific configs here if needed
+            ;;
+    esac
+    
+    log_verbose "Initialized ${#CONFIG_MAPPINGS[@]} configuration mappings for platform: $PLATFORM"
+}
+
+# CONFIG_MAPPINGS will be initialized by setup_config_mappings() function
 
 # Validate mapping format: name:system_path:repo_path:type
 validate_mapping_format() {
@@ -161,9 +398,28 @@ list_backup_files() {
         return 0
     fi
     
-    find "$BACKUP_DIR" -type f -name "*_[0-9]*_[0-9]*" -exec stat -f "%m %N" {} \; 2>/dev/null | \
-        sort -n | \
-        cut -d' ' -f2-
+    # Use platform-appropriate find and sort
+    case "$PLATFORM" in
+        windows)
+            # Windows might have limited find capabilities
+            if command -v find >/dev/null && command -v sort >/dev/null; then
+                find "$BACKUP_DIR" -type f -name "*_[0-9]*_[0-9]*" 2>/dev/null | sort
+            else
+                # Fallback to basic listing
+                ls "$BACKUP_DIR"/*_[0-9]*_[0-9]* 2>/dev/null | sort
+            fi
+            ;;
+        macos)
+            find "$BACKUP_DIR" -type f -name "*_[0-9]*_[0-9]*" -exec stat -f "%m %N" {} \; 2>/dev/null | \
+                sort -n | \
+                cut -d' ' -f2-
+            ;;
+        *)
+            find "$BACKUP_DIR" -type f -name "*_[0-9]*_[0-9]*" -exec stat -c "%Y %n" {} \; 2>/dev/null | \
+                sort -n | \
+                cut -d' ' -f2-
+            ;;
+    esac
 }
 
 # Clean up old backups based on retention policy
@@ -276,17 +532,41 @@ show_backup_stats() {
     for backup_file in "${backup_files[@]}"; do
         if [[ -f "$backup_file" ]]; then
             local size
-            size=$(stat -f%z "$backup_file" 2>/dev/null || echo "0")
+            size=$(get_file_size "$backup_file")
             total_size=$((total_size + size))
         elif [[ -d "$backup_file" ]]; then
-            local size
-            size=$(du -sk "$backup_file" 2>/dev/null | cut -f1 || echo "0")
-            total_size=$((total_size + size * 1024))
+            # Platform-specific directory size calculation
+            case "$PLATFORM" in
+                macos)
+                    local size
+                    size=$(du -sk "$backup_file" 2>/dev/null | cut -f1 || echo "0")
+                    total_size=$((total_size + size * 1024))
+                    ;;
+                linux)
+                    local size
+                    size=$(du -sb "$backup_file" 2>/dev/null | cut -f1 || echo "0")
+                    total_size=$((total_size + size))
+                    ;;
+                windows)
+                    # Windows du might not be available
+                    if command -v du >/dev/null; then
+                        local size
+                        size=$(du -sk "$backup_file" 2>/dev/null | cut -f1 || echo "0")
+                        total_size=$((total_size + size * 1024))
+                    fi
+                    ;;
+                *)
+                    local size
+                    size=$(du -sb "$backup_file" 2>/dev/null | cut -f1 || echo "0")
+                    total_size=$((total_size + size))
+                    ;;
+            esac
         fi
     done
     
     local total_mb=$((total_size / 1024 / 1024))
     echo "Backup Statistics:"
+    echo "  Platform: $PLATFORM"
     echo "  Total backups: ${#backup_files[@]}"
     echo "  Total size: ${total_mb}MB"
     echo "  Retention: $BACKUP_RETENTION_DAYS days (max $BACKUP_MAX_COUNT files)"
@@ -655,6 +935,8 @@ rollback_config() {
 usage() {
     echo "Usage: $0 [options] {pull|push|backup-stats|backup-cleanup|rollback|list-backups}"
     echo ""
+    echo "Platform: $PLATFORM"
+    echo ""
     echo "Operations:"
     echo "  pull            - Copy configs from system to repository"
     echo "  push            - Copy configs from repository to system"
@@ -745,7 +1027,7 @@ sync_config() {
     local mode="$5"
     
     log_info "Syncing $name config..."
-    log_verbose "  Mode: $mode, Type: $type"
+    log_verbose "  Mode: $mode, Type: $type, Platform: $PLATFORM"
     
     # Validate paths before proceeding
     if ! validate_paths "$system_path" "$repo_path" "$mode"; then
@@ -753,7 +1035,6 @@ sync_config() {
         return 1
     fi
     
-    # Mode-specific operations with enhanced error handling
     if [[ "$mode" == "pull" ]]; then
         show_dry_run_details "PULL" "$system_path" "$repo_path" "$type"
         
@@ -766,28 +1047,26 @@ sync_config() {
             fi
         fi
         
-        # Perform copy operation
+        # Perform copy operation using platform-safe functions
         if [[ "$type" == "dir" ]]; then
             log_verbose "Copying directory: $system_path -> $repo_path"
-            if ! dry_run_execute "Remove existing directory" "rm -rf \"$repo_path\""; then
-                log_error "Failed to remove existing directory: $repo_path"
-                return 1
-            fi
-            if ! dry_run_execute "Copy directory" "cp -r \"$system_path\" \"$repo_path\""; then
-                log_error "Failed to copy directory: $system_path -> $repo_path"
-                return 1
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY-RUN] Would copy directory: $system_path -> $repo_path"
+            else
+                if ! safe_copy_directory "$system_path" "$repo_path"; then
+                    log_error "Failed to copy directory: $system_path -> $repo_path"
+                    return 1
+                fi
             fi
         else
             log_verbose "Copying file: $system_path -> $repo_path"
-            local repo_parent_dir
-            repo_parent_dir="$(dirname "$repo_path")"
-            if ! dry_run_execute "Create parent directory" "mkdir -p \"$repo_parent_dir\""; then
-                log_error "Failed to create parent directory for: $repo_path"
-                return 1
-            fi
-            if ! dry_run_execute "Copy file" "cp \"$system_path\" \"$repo_path\""; then
-                log_error "Failed to copy file: $system_path -> $repo_path"
-                return 1
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY-RUN] Would copy file: $system_path -> $repo_path"
+            else
+                if ! safe_copy_file "$system_path" "$repo_path"; then
+                    log_error "Failed to copy file: $system_path -> $repo_path"
+                    return 1
+                fi
             fi
         fi
         
@@ -803,34 +1082,26 @@ sync_config() {
             fi
         fi
         
-        # Perform copy operation
+        # Perform copy operation using platform-safe functions
         if [[ "$type" == "dir" ]]; then
             log_verbose "Copying directory: $repo_path -> $system_path"
-            if ! dry_run_execute "Remove existing directory" "rm -rf \"$system_path\""; then
-                log_error "Failed to remove existing directory: $system_path"
-                return 1
-            fi
-            local system_parent_dir
-            system_parent_dir="$(dirname "$system_path")"
-            if ! dry_run_execute "Create parent directory" "mkdir -p \"$system_parent_dir\""; then
-                log_error "Failed to create parent directory for: $system_path"
-                return 1
-            fi
-            if ! dry_run_execute "Copy directory" "cp -r \"$repo_path\" \"$system_path\""; then
-                log_error "Failed to copy directory: $repo_path -> $system_path"
-                return 1
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY-RUN] Would copy directory: $repo_path -> $system_path"
+            else
+                if ! safe_copy_directory "$repo_path" "$system_path"; then
+                    log_error "Failed to copy directory: $repo_path -> $system_path"
+                    return 1
+                fi
             fi
         else
             log_verbose "Copying file: $repo_path -> $system_path"
-            local system_parent_dir2
-            system_parent_dir2="$(dirname "$system_path")"
-            if ! dry_run_execute "Create parent directory" "mkdir -p \"$system_parent_dir2\""; then
-                log_error "Failed to create parent directory for: $system_path"
-                return 1
-            fi
-            if ! dry_run_execute "Copy file" "cp \"$repo_path\" \"$system_path\""; then
-                log_error "Failed to copy file: $repo_path -> $system_path"
-                return 1
+            if [[ "$DRY_RUN" == "true" ]]; then
+                log_info "[DRY-RUN] Would copy file: $repo_path -> $system_path"
+            else
+                if ! safe_copy_file "$repo_path" "$system_path"; then
+                    log_error "Failed to copy file: $repo_path -> $system_path"
+                    return 1
+                fi
             fi
         fi
     fi
@@ -844,6 +1115,9 @@ sync_config() {
 }
 
 main() {
+    # Initialize platform-specific configuration mappings
+    setup_config_mappings
+    
     local mode=""
     local rollback_target=""
     local config_name=""
